@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 #include <math.h>
+#include <errno.h>
 
 #define RECORD_SIZE 512 // Bytes
 #define BLAST_SIZE 200 // Records 
@@ -38,16 +39,17 @@ socklen_t client_addr_len = sizeof(client_addr);
 
 void recvBlast(int sockfd, FILE *fp) {    
     struct Packet packetToRecv;
-    memset(&packetToRecv, 0, sizeof(packetToRecv));
-
-    // packetToRecv.TYPE = 1;
     packetToRecv.SEND_PACKETS = 1;
-    int packetListCheck[13];
+    int packetListCheck[13] = {0};
 
     while(packetToRecv.SEND_PACKETS == 1) {
         int n = recvfrom(sockfd, &packetToRecv, sizeof(packetToRecv), 0, (struct sockaddr *)&client_addr, &client_addr_len); 
+        printf("Packet arrive : %d and TYPE : %d\n", packetToRecv.PACKET_NUMBER, packetToRecv.TYPE);
 
         int packNum = packetToRecv.PACKET_NUMBER;
+        
+        //Special Message
+        if(packNum != 123)
         packetListCheck[packNum] = 1;
 
         //Packet Data
@@ -59,8 +61,8 @@ void recvBlast(int sockfd, FILE *fp) {
             for(int i = start; i <= end; i++) {
                 fwrite(packetToRecv.storedRecords[i], 1, RECORD_SIZE, fp);
             }
+
         }
-        
         //Packet -> IS_BLAST_OVER
         else if(packetToRecv.TYPE == 0) {
             //Make a list of packets not received
@@ -76,10 +78,17 @@ void recvBlast(int sockfd, FILE *fp) {
                 }
             }
             
-            if(listEmpty == 1)
-            packetToRecv.SEND_PACKETS = 0;
+            if(listEmpty == 1) {
+                packetToRecv.SEND_PACKETS = 0;
+                //Empty the Packet List
+                memset(packetListCheck, 0, sizeof(packetListCheck));
+            }
+            
+            printf("Sending REC_MISS(Is empty) : %d\n", listEmpty);
 
             sendto(sockfd, &packetToRecv, sizeof(packetToRecv), 0, (struct sockaddr *)&client_addr, client_addr_len);
+
+            packetToRecv.SEND_PACKETS = 1;
         }
     }
 }

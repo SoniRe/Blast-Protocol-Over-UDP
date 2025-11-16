@@ -40,23 +40,28 @@ struct Packet {
 
 void sendPackets(int sockfd, struct Packet packets[], int totalPackets, int *toSendList) {
     for(int i = 0;i < totalPackets; i++) {
-        if(toSendList[i] == 1)
+        if(toSendList[i] == 1) 
         sendto(sockfd, &packets[i], sizeof(packets[i]), 0, (struct sockaddr *)&server_addr, addr_len);
+        
     }
 }
 
 void isBlastOver(int sockfd, int totalPackets) {
     struct Packet packet;
-    memset(&packet, 0, sizeof(packet));
 
+    packet.PACKET_NUMBER = 123; // SPECIAL PACKET
     packet.PACKET_LEN = totalPackets;
     packet.TYPE = 0; // BLAST OVER CHECK
+    packet.SEND_PACKETS = 1;
     
     for(int i = 0;i < totalPackets; i++) {
         packet.packetList[i] = 1;
     }
 
+    usleep(5000);
+
     sendto(sockfd, &packet, sizeof(packet), 0, (struct sockaddr *)&server_addr, addr_len);
+    printf("Blast Packet with TYPE %d\n", packet.TYPE);
 }
 
 
@@ -105,7 +110,6 @@ void blastFile(int sockfd, int totalRecords, FILE *fp) {
         
         //Enquiry Packet
         struct Packet packetsToSend;
-        memset(&packetsToSend, 0, sizeof(packetsToSend));
         packetsToSend.SEND_PACKETS = 1;
 
         int copyOfmaxRecordsInBlast = maxRecordsInBlast;
@@ -129,7 +133,7 @@ void blastFile(int sockfd, int totalRecords, FILE *fp) {
         }
          
 
-        while(packetsToSend.SEND_PACKETS == 1){
+        while(packetsToSend.SEND_PACKETS == 1) {
             sendPackets(sockfd, packets, PACKETS_BLAST, packetsToSend.packetList);
             printf("%s", "All Packets sent\n");
             
@@ -139,7 +143,7 @@ void blastFile(int sockfd, int totalRecords, FILE *fp) {
             struct Packet recvdPacket;
             recvfrom(sockfd, &recvdPacket, sizeof(recvdPacket), 0, (struct sockaddr*)&server_addr, &addr_len);
 
-            packetsToSend = recvdPacket;
+            packetsToSend.SEND_PACKETS = recvdPacket.SEND_PACKETS;
         }
         
         //Blast Over
@@ -161,7 +165,7 @@ int main() {
     FILE_SIZE = findFileSize(fp);
 
     struct timeval timeout;
-    timeout.tv_sec = 5; // 5 second 
+    timeout.tv_sec = 10; // 10 second 
     timeout.tv_usec = 0; // 0 micro
 
     int sockfd = socket(AF_INET, SOCK_DGRAM ,0);
