@@ -84,12 +84,14 @@ void recvBlast(int sockfd, FILE *fp) {
                 if(packetListCheck[i] == 0) {
                     packetToRecv.packetList[i] = 1;
                     listEmpty = 0;
+		    packetToRecv.SEND_PACKETS = 1;
                 }
                 else if(packetListCheck[i] == 1) {
                     packetToRecv.packetList[i] = 0;
                 }
             }
             
+
             if(listEmpty == 1) {
                 int packet_start = 0;
                 int packet_end = packetToRecv.PACKET_LEN;
@@ -103,8 +105,6 @@ void recvBlast(int sockfd, FILE *fp) {
                         fwrite(packets[pack_ind].storedRecords[i], 1, RECORD_SIZE, fp);
                     }
                 }
-
-		usleep(1000);
 
 
                 packetToRecv.SEND_PACKETS = 0;
