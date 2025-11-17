@@ -145,6 +145,8 @@ void blastFile(int sockfd, int totalRecords, FILE *fp) {
             recvfrom(sockfd, &recvdPacket, sizeof(recvdPacket), 0, (struct sockaddr*)&server_addr, &addr_len);
 
             packetsToSend.SEND_PACKETS = recvdPacket.SEND_PACKETS;
+
+            packetsToSend.SEND_PACKETS != packetsToSend.SEND_PACKETS;
         }
         
         //Blast Over
