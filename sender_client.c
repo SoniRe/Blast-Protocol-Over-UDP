@@ -40,8 +40,11 @@ struct Packet {
 
 void sendPackets(int sockfd, struct Packet packets[], int totalPackets, int *toSendList) {
     for(int i = 0;i < totalPackets; i++) {
-        if(toSendList[i] == 1) 
-        sendto(sockfd, &packets[i], sizeof(packets[i]), 0, (struct sockaddr *)&server_addr, addr_len);
+        if(toSendList[i] == 1) {
+            printf("Packet Sent : %d\n", i);
+            sendto(sockfd, &packets[i], sizeof(packets[i]), 0, (struct sockaddr *)&server_addr, addr_len);
+            usleep(50000);
+        }
         
     }
 }
@@ -58,8 +61,8 @@ void isBlastOver(int sockfd, int totalPackets) {
         packet.packetList[i] = 1;
     }
 
-    usleep(5000);
-
+    usleep(50000);
+    
     sendto(sockfd, &packet, sizeof(packet), 0, (struct sockaddr *)&server_addr, addr_len);
     printf("Blast Packet with TYPE %d\n", packet.TYPE);
 }
@@ -120,13 +123,11 @@ void blastFile(int sockfd, int totalRecords, FILE *fp) {
                 createPacket(&packets[currentPacket], fp, MAX_RECORDS_PER_PACKET);
                 packets[currentPacket].PACKET_NUMBER = currentPacket;
                 copyOfmaxRecordsInBlast -= MAX_RECORDS_PER_PACKET;
-                printf("Created Packet %d\n", currentPacket);
             }
             else {
                 createPacket(&packets[currentPacket], fp, copyOfmaxRecordsInBlast);
                 packets[currentPacket].PACKET_NUMBER = currentPacket;
                 copyOfmaxRecordsInBlast -= copyOfmaxRecordsInBlast;
-                printf("Created Packet %d\n", currentPacket);
             }
 
             packetsToSend.packetList[currentPacket] = 1;

@@ -42,8 +42,17 @@ void recvBlast(int sockfd, FILE *fp) {
     packetToRecv.SEND_PACKETS = 1;
     int packetListCheck[13] = {0};
 
+    struct Packet packets[13];
+    memset(packets, 0, sizeof(packets));
+
     while(packetToRecv.SEND_PACKETS == 1) {
         int n = recvfrom(sockfd, &packetToRecv, sizeof(packetToRecv), 0, (struct sockaddr *)&client_addr, &client_addr_len); 
+        
+        if(n < 0) {
+            //Receive Timeout
+            if(errno == EWOULDBLOCK || errno == EAGAIN) break;
+        }
+
         printf("Packet arrive : %d and TYPE : %d\n", packetToRecv.PACKET_NUMBER, packetToRecv.TYPE);
 
         int packNum = packetToRecv.PACKET_NUMBER;
@@ -54,6 +63,8 @@ void recvBlast(int sockfd, FILE *fp) {
 
         //Packet Data
         if(packetToRecv.TYPE == 1) {
+            packets[packNum] = packetToRecv;
+            /*
             int start = packetToRecv.recordList[0];
             int end =   packetToRecv.recordList[1];
             
@@ -61,6 +72,7 @@ void recvBlast(int sockfd, FILE *fp) {
             for(int i = start; i <= end; i++) {
                 fwrite(packetToRecv.storedRecords[i], 1, RECORD_SIZE, fp);
             }
+            */
 
         }
         //Packet -> IS_BLAST_OVER
@@ -79,8 +91,25 @@ void recvBlast(int sockfd, FILE *fp) {
             }
             
             if(listEmpty == 1) {
+                int packet_start = 0;
+                int packet_end = packetToRecv.PACKET_LEN;
+                for(int pack_ind = packet_start; pack_ind < packet_end; pack_ind++) {
+                    int start = packets[pack_ind].recordList[0];
+                    int end =   packets[pack_ind].recordList[1];
+                    
+                    //Inserting All Records of Packet in File
+		    printf("Records written : %d\n", end - start + 1);
+                    for(int i = start; i <= end; i++) {
+                        fwrite(packets[pack_ind].storedRecords[i], 1, RECORD_SIZE, fp);
+                    }
+                }
+
+		usleep(1000);
+
+
                 packetToRecv.SEND_PACKETS = 0;
                 //Empty the Packet List
+                memset(packets, 0, sizeof(packets));
                 memset(packetListCheck, 0, sizeof(packetListCheck));
             }
             
@@ -102,6 +131,12 @@ int main() {
         printf("Socket Creation Error\n");
         return - 1;
     }
+
+    struct timeval timeout;
+    timeout.tv_sec = 10; // 10 sec
+    timeout.tv_usec = 0;
+
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     printf("[+] Socket is Created\n");
 
