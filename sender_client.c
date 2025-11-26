@@ -7,6 +7,9 @@
 #include <sys/time.h>
 #include <errno.h>
 #include <math.h>
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define RECORD_SIZE 512 // Bytes
 #define BLAST_SIZE 200 // Records 
@@ -38,14 +41,26 @@ struct Packet {
     int SEND_PACKETS; // 0 -> List Is Empty, 1 -> Packet Lost On Way
 };
 
+int garblerModule() {
+    //10% Packet Loss
+    srand(time(NULL));
+    double random_number = (double)rand() / (RAND_MAX + 1.0);
+    return (random_number < 0.9 ? 1 : 0);
+}
+
 void sendPackets(int sockfd, struct Packet packets[], int totalPackets, int *toSendList) {
     for(int i = 0;i < totalPackets; i++) {
         if(toSendList[i] == 1) {
-            printf("Packet Sent : %d\n", i);
-            sendto(sockfd, &packets[i], sizeof(packets[i]), 0, (struct sockaddr *)&server_addr, addr_len);
-            usleep(50000);
+            if(garblerModule() == 1) {
+                packets[i].PACKET_NUMBER = i;
+                printf("Packet Sent : %d\n", i);
+                sendto(sockfd, &packets[i], sizeof(packets[i]), 0, (struct sockaddr *)&server_addr, addr_len);
+                usleep(50000);
+            }
+            else {
+                printf("Packet Dropped : %d\n", i);
+            }
         }
-        
     }
 }
 
@@ -61,7 +76,7 @@ void isBlastOver(int sockfd, int totalPackets) {
         packet.packetList[i] = 1;
     }
 
-    usleep(50000);
+    usleep(500000);
     
     sendto(sockfd, &packet, sizeof(packet), 0, (struct sockaddr *)&server_addr, addr_len);
     printf("Blast Packet with TYPE %d\n", packet.TYPE);
@@ -93,6 +108,8 @@ void blastFile(int sockfd, int totalRecords, FILE *fp) {
     printf("Packets per Blast : %d\n", (int)PACKETS_PER_BLAST);
     
     while(totalRecords > 0) {
+        printf("\n\n--- NEW BLAST ---\n");
+
         printf("Total Records to Transfer : %d\n", (int)totalRecords);
 
         int PACKETS_BLAST;
@@ -144,7 +161,10 @@ void blastFile(int sockfd, int totalRecords, FILE *fp) {
             struct Packet recvdPacket;
             recvfrom(sockfd, &recvdPacket, sizeof(recvdPacket), 0, (struct sockaddr*)&server_addr, &addr_len);
 
-            packetsToSend.SEND_PACKETS = recvdPacket.SEND_PACKETS;
+            for(int i = 0;i < recvdPacket.PACKET_LEN; i++) 
+            packetsToSend.packetList[i] = recvdPacket.packetList[i];
+
+            packetsToSend = recvdPacket;
 
             packetsToSend.SEND_PACKETS != packetsToSend.SEND_PACKETS;
         }
@@ -164,7 +184,7 @@ size_t findFileSize(FILE *fp) {
 
 int main() {
     FILE *fp;
-    fp = fopen("KiBanu.mp4", "rb");
+    fp = fopen("SendVideo.mp4", "rb");
     FILE_SIZE = findFileSize(fp);
 
     struct timeval timeout;
@@ -200,7 +220,7 @@ int main() {
 
     //PHASE-1
     struct FILE_HEADER send_header;
-    strcpy(send_header.file_name, "KiBanu.mp4");
+    strcpy(send_header.file_name, "SendVideo.mp4");
     send_header.file_size = FILE_SIZE;
     send_header.record_size = RECORD_SIZE;
     

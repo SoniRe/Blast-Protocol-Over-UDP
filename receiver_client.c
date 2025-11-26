@@ -49,7 +49,6 @@ void recvBlast(int sockfd, FILE *fp) {
         int n = recvfrom(sockfd, &packetToRecv, sizeof(packetToRecv), 0, (struct sockaddr *)&client_addr, &client_addr_len); 
         
         if(n < 0) {
-            //Receive Timeout
             if(errno == EWOULDBLOCK || errno == EAGAIN) break;
         }
 
@@ -64,16 +63,6 @@ void recvBlast(int sockfd, FILE *fp) {
         //Packet Data
         if(packetToRecv.TYPE == 1) {
             packets[packNum] = packetToRecv;
-            /*
-            int start = packetToRecv.recordList[0];
-            int end =   packetToRecv.recordList[1];
-            
-            //Inserting All Records of Packet in File
-            for(int i = start; i <= end; i++) {
-                fwrite(packetToRecv.storedRecords[i], 1, RECORD_SIZE, fp);
-            }
-            */
-
         }
         //Packet -> IS_BLAST_OVER
         else if(packetToRecv.TYPE == 0) {
@@ -84,7 +73,7 @@ void recvBlast(int sockfd, FILE *fp) {
                 if(packetListCheck[i] == 0) {
                     packetToRecv.packetList[i] = 1;
                     listEmpty = 0;
-		    packetToRecv.SEND_PACKETS = 1;
+		            packetToRecv.SEND_PACKETS = 1;
                 }
                 else if(packetListCheck[i] == 1) {
                     packetToRecv.packetList[i] = 0;
@@ -114,6 +103,17 @@ void recvBlast(int sockfd, FILE *fp) {
             }
             
             printf("Sending REC_MISS(Is empty) : %d\n", listEmpty);
+            
+            if(listEmpty == 0)
+            printf("Packets Lost : ");
+
+            for(int i = 0;i < packetToRecv.PACKET_LEN; i++) {
+                    if(packetToRecv.packetList[i] == 1) {
+                        printf(" %d , ", i);
+                    }
+
+                    if(i == packetToRecv.PACKET_LEN - 1) printf("\n");
+            }
 
             sendto(sockfd, &packetToRecv, sizeof(packetToRecv), 0, (struct sockaddr *)&client_addr, client_addr_len);
 
