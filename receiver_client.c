@@ -13,6 +13,7 @@
 #define MAX_RECORDS_PER_PACKET 16
 
 int PACKETS_PER_BLAST = ceil((double)BLAST_SIZE / MAX_RECORDS_PER_PACKET);
+int currentBlastNumber = 0;
 
 char SERVER_IP[20];
 int PORT;
@@ -30,7 +31,7 @@ struct Packet {
     int PACKET_NUMBER;
     int PACKET_LEN;
     int TYPE; //1 -> Data, 0 -> IS_BLAST_OVER
-    int SEND_PACKETS; // 0 -> List Is Empty, 1 -> Packet Lost On Way
+    int SEND_PACKETS; // 0 -> List Is Empty, 1 -> Packet Lost On Way or Packet Remain to Send
 };
 
 
@@ -66,8 +67,16 @@ void recvBlast(int sockfd, FILE *fp) {
         }
         //Packet -> IS_BLAST_OVER
         else if(packetToRecv.TYPE == 0) {
+            //Special Packet - 123
+            int recvdBlastNumber = packetToRecv.recordList[0];
+            if(recvdBlastNumber < currentBlastNumber) {
+                printf("Packet Discarded\n");
+                continue;
+            };
+            
             //Make a list of packets not received
-            int listEmpty = 1;
+            int listEmpty = 1; //List Empty is true
+            packetToRecv.SEND_PACKETS = 0;
 
             for(int i = 0;i < packetToRecv.PACKET_LEN; i++) {
                 if(packetListCheck[i] == 0) {
@@ -82,6 +91,8 @@ void recvBlast(int sockfd, FILE *fp) {
             
 
             if(listEmpty == 1) {
+                currentBlastNumber++;
+
                 int packet_start = 0;
                 int packet_end = packetToRecv.PACKET_LEN;
                 for(int pack_ind = packet_start; pack_ind < packet_end; pack_ind++) {
@@ -102,7 +113,10 @@ void recvBlast(int sockfd, FILE *fp) {
                 memset(packetListCheck, 0, sizeof(packetListCheck));
             }
             
-            printf("Sending REC_MISS(Is empty) : %d\n", listEmpty);
+            char msg1[4] = "Yes";
+            if(listEmpty == 0) strcpy(msg1, "No"); 
+
+            printf("Sending REC_MISS(Is empty) : %s\n", msg1);
             
             if(listEmpty == 0)
             printf("Packets Lost : ");
@@ -133,7 +147,7 @@ int main() {
     }
 
     struct timeval timeout;
-    timeout.tv_sec = 10; // 10 sec
+    timeout.tv_sec = 20; // 10 sec
     timeout.tv_usec = 0;
 
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));

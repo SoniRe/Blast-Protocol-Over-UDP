@@ -18,6 +18,7 @@
 int PACKETS_PER_BLAST = ceil((double)BLAST_SIZE / MAX_RECORDS_PER_PACKET);
 size_t FILE_SIZE;
 size_t TOTAL_RECORDS;
+int blastNumber = 0;
 
 char RECEIVER_IP[20];
 int PORT;
@@ -38,7 +39,7 @@ struct Packet {
     int PACKET_NUMBER;
     int PACKET_LEN;
     int TYPE; //1 -> Data, 0 -> IS_BLAST_OVER
-    int SEND_PACKETS; // 0 -> List Is Empty, 1 -> Packet Lost On Way
+    int SEND_PACKETS; // 0 -> List Is Empty, 1 -> Packet Lost On Way or Packet Remain to Send
 };
 
 int garblerModule() {
@@ -51,15 +52,10 @@ int garblerModule() {
 void sendPackets(int sockfd, struct Packet packets[], int totalPackets, int *toSendList) {
     for(int i = 0;i < totalPackets; i++) {
         if(toSendList[i] == 1) {
-            if(garblerModule() == 1) {
-                packets[i].PACKET_NUMBER = i;
-                printf("Packet Sent : %d\n", i);
-                sendto(sockfd, &packets[i], sizeof(packets[i]), 0, (struct sockaddr *)&server_addr, addr_len);
-                usleep(50000);
-            }
-            else {
-                printf("Packet Dropped : %d\n", i);
-            }
+            packets[i].PACKET_NUMBER = i;
+            printf("Packet Sent : %d\n", i);
+            sendto(sockfd, &packets[i], sizeof(packets[i]), 0, (struct sockaddr *)&server_addr, addr_len);
+            // usleep(50000);
         }
     }
 }
@@ -67,16 +63,17 @@ void sendPackets(int sockfd, struct Packet packets[], int totalPackets, int *toS
 void isBlastOver(int sockfd, int totalPackets) {
     struct Packet packet;
 
+    packet.recordList[0] = blastNumber;
     packet.PACKET_NUMBER = 123; // SPECIAL PACKET
     packet.PACKET_LEN = totalPackets;
     packet.TYPE = 0; // BLAST OVER CHECK
-    packet.SEND_PACKETS = 1;
+    packet.SEND_PACKETS = 1; // List Is Empty ?
     
     for(int i = 0;i < totalPackets; i++) {
         packet.packetList[i] = 1;
     }
 
-    usleep(500000);
+    // usleep(500000);
     
     sendto(sockfd, &packet, sizeof(packet), 0, (struct sockaddr *)&server_addr, addr_len);
     printf("Blast Packet with TYPE %d\n", packet.TYPE);
@@ -150,8 +147,9 @@ void blastFile(int sockfd, int totalRecords, FILE *fp) {
             packetsToSend.packetList[currentPacket] = 1;
         }
          
-
-        while(packetsToSend.SEND_PACKETS == 1) {
+        int retryCount = 10;
+        //If No Ack from that side
+        while(retryCount > 0 && packetsToSend.SEND_PACKETS == 1) {
             sendPackets(sockfd, packets, PACKETS_BLAST, packetsToSend.packetList);
             printf("%s", "All Packets sent\n");
             
@@ -159,18 +157,29 @@ void blastFile(int sockfd, int totalRecords, FILE *fp) {
             printf("%s", "Is Blast Over Sent\n");
 
             struct Packet recvdPacket;
-            recvfrom(sockfd, &recvdPacket, sizeof(recvdPacket), 0, (struct sockaddr*)&server_addr, &addr_len);
+            int n = recvfrom(sockfd, &recvdPacket, sizeof(recvdPacket), 0, (struct sockaddr*)&server_addr, &addr_len);
 
-            for(int i = 0;i < recvdPacket.PACKET_LEN; i++) 
-            packetsToSend.packetList[i] = recvdPacket.packetList[i];
+            if(n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                printf("Timeout Occured\n");
+                retryCount--;
+                continue;
+            }
+
+            if(recvdPacket.SEND_PACKETS == 0) break;
+
+            for(int i = 0;i < recvdPacket.PACKET_LEN; i++) {
+                packetsToSend.packetList[i] = recvdPacket.packetList[i];
+                if(packetsToSend.packetList[i] == 0) printf("Packet %d dropped\n", i);
+            }
 
             packetsToSend = recvdPacket;
 
-            packetsToSend.SEND_PACKETS != packetsToSend.SEND_PACKETS;
+            packetsToSend.SEND_PACKETS = !(packetsToSend.SEND_PACKETS);
         }
         
         //Blast Over
         totalRecords -= maxRecordsInBlast;
+        blastNumber++;
     }
 }
 
