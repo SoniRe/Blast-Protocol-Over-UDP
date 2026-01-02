@@ -153,6 +153,7 @@ void blastFile(int sockfd, int totalRecords, FILE *fp) {
             sendPackets(sockfd, packets, PACKETS_BLAST, packetsToSend.packetList);
             printf("%s", "All Packets sent\n");
             
+            ackLost:
             isBlastOver(sockfd, PACKETS_BLAST);
             printf("%s", "Is Blast Over Sent\n");
 
@@ -162,6 +163,7 @@ void blastFile(int sockfd, int totalRecords, FILE *fp) {
             if(n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
                 printf("Timeout Occured\n");
                 retryCount--;
+                goto ackLost;
                 continue;
             }
 
