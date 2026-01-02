@@ -163,7 +163,7 @@ void blastFile(int sockfd, int totalRecords, FILE *fp) {
             if(n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
                 printf("Timeout Occured\n");
                 retryCount--;
-                goto ackLost;
+                if(retryCount > 0) goto ackLost;
                 continue;
             }
 
